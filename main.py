@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Union, List
-from services import find_matching_listings, retrieve_supplier_detail, submit_purchase_requisition
+from services import find_matching_listings, retrieve_supplier_detail, submit_purchase_requisition, retrieve_supplier_ratings
 
 app = FastAPI(
     title="Fusion Procurement Tools",
@@ -24,6 +24,9 @@ class PurchaseRequisitionRequest(BaseModel):
     destination_org_id: str
     deliver_to_location_id: str
     requested_delivery_date: Union[str, None] = None
+
+class SupplierRatingsRequest(BaseModel):
+    supplier_id: str
 
 @app.get("/")
 async def root():
@@ -70,6 +73,17 @@ async def submit_purchase_requisition_endpoint(request: PurchaseRequisitionReque
             destination_org_id=request.destination_org_id,
             deliver_to_location_id=request.deliver_to_location_id,
             requested_delivery_date=request.requested_delivery_date
+        )
+        return {"data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/retrieve_supplier_ratings")
+async def retrieve_supplier_ratings_endpoint(request: SupplierRatingsRequest):
+    """Retrieve supplier ratings and feedback from Oracle database"""
+    try:
+        result = await retrieve_supplier_ratings(
+            supplier_id=request.supplier_id
         )
         return {"data": result}
     except Exception as e:

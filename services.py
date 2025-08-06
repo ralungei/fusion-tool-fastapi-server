@@ -2,6 +2,7 @@ from typing import Any
 import httpx
 import os
 import json
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -9,11 +10,23 @@ try:
 except ImportError:
     pass
 
+try:
+    import oracledb
+except ImportError:
+    oracledb = None
+
 FUSION_API_BASE = "https://fa-eqiq-dev18-saasfademo1.ds-fa.oraclepdemos.com"
 USER_AGENT = "fusion-fastapi-client/1.0"
 FUSION_AUTH_READ = os.getenv("FUSION_AUTH_READ")
 FUSION_AUTH_WRITE = os.getenv("FUSION_AUTH_WRITE")
 FUSION_USER_ID = os.getenv("FUSION_USER_ID")
+
+# Oracle Database configuration
+DB_USER = os.getenv("DB_USER", "ADMIN")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "Ansh4luv@ora")
+DB_DSN = os.getenv("DB_DSN", "t2v6c9rz6jx7a2zq_high")
+DB_WALLET_PASSWORD = os.getenv("DB_WALLET_PASSWORD", "admin123")
+WALLET_DIR = Path("wallet")
 
 required_vars = {
     "FUSION_AUTH_READ": FUSION_AUTH_READ,
@@ -849,3 +862,125 @@ def format_requisition_response(header: dict, line: dict = None) -> str:
         ])
     
     return "\n".join(formatted_lines)
+
+async def get_db_connection():
+    """Get a connection to the Oracle database.
+    
+    Returns:
+        Database connection object or None if connection fails.
+    """
+    if not oracledb:
+        return None
+    
+    if not WALLET_DIR.exists():
+        print(f"Warning: Wallet directory {WALLET_DIR} does not exist")
+        return None
+    
+    try:
+        connection = await oracledb.connect_async(
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dsn=DB_DSN,
+            config_dir=str(WALLET_DIR),
+            wallet_location=str(WALLET_DIR),
+            wallet_password=DB_WALLET_PASSWORD
+        )
+        return connection
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
+async def retrieve_supplier_ratings(supplier_id: str) -> str:
+    """Retrieve supplier ratings and feedback from the database.
+    
+    Args:
+        supplier_id: The supplier ID to get ratings for
+        
+    Returns:
+        A formatted string with supplier ratings and feedback.
+    """
+    
+    if not oracledb:
+        return json.dumps({
+            "error": "Database module not available",
+            "message": "oracledb module is not installed. Please install it with: pip install oracledb"
+        })
+    
+    connection = await get_db_connection()
+    if not connection:
+        return json.dumps({
+            "error": "Database connection failed",
+            "message": "Could not connect to Oracle database. Check wallet configuration and credentials."
+        })
+    
+    try:
+        cursor = await connection.cursor()
+        
+        # Query to get supplier feedback and ratings
+        query = """
+            SELECT 
+                SUPPLIER_ID,
+                RATING,
+                FEEDBACK_TEXT,
+                REVIEW_DATE,
+                REVIEWER_NAME,
+                ORDER_ID,
+                CATEGORY
+            FROM SUPPLIERFEEDBACK
+            WHERE SUPPLIER_ID = :supplier_id
+            ORDER BY REVIEW_DATE DESC
+        """
+        
+        await cursor.execute(query, supplier_id=supplier_id)
+        
+        # Fetch all results
+        columns = [col[0] for col in cursor.description]
+        rows = await cursor.fetchall()
+        
+        if not rows:
+            return json.dumps({
+                "supplier_id": supplier_id,
+                "message": "No ratings found for this supplier",
+                "total_reviews": 0,
+                "average_rating": None,
+                "reviews": []
+            })
+        
+        # Process results
+        reviews = []
+        total_rating = 0
+        
+        for row in rows:
+            review = dict(zip(columns, row))
+            reviews.append({
+                "rating": review.get("RATING"),
+                "feedback": review.get("FEEDBACK_TEXT"),
+                "date": str(review.get("REVIEW_DATE")) if review.get("REVIEW_DATE") else None,
+                "reviewer": review.get("REVIEWER_NAME"),
+                "order_id": review.get("ORDER_ID"),
+                "category": review.get("CATEGORY")
+            })
+            if review.get("RATING"):
+                total_rating += review.get("RATING")
+        
+        # Calculate average rating
+        average_rating = total_rating / len(rows) if rows else None
+        
+        result = {
+            "supplier_id": supplier_id,
+            "total_reviews": len(rows),
+            "average_rating": round(average_rating, 2) if average_rating else None,
+            "reviews": reviews[:10]  # Return top 10 most recent reviews
+        }
+        
+        return json.dumps(result, indent=2)
+        
+    except Exception as e:
+        return json.dumps({
+            "error": "Database query failed",
+            "message": str(e),
+            "supplier_id": supplier_id
+        })
+    finally:
+        await cursor.close()
+        await connection.close()

@@ -40,3 +40,9 @@ venv.bak/
 # OS
 .DS_Store
 Thumbs.db
+
+# Oracle Wallet - contains sensitive connection files
+wallet/
+*.sso
+*.p12
+*.ora
