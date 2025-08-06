@@ -1,7 +1,6 @@
 from typing import Any
 import httpx
 import os
-import json
 from pathlib import Path
 
 try:
@@ -338,12 +337,12 @@ async def find_matching_listings(product_query_terms, limit: int = 10) -> str:
     if errors:
         error_detail = "; ".join(errors)
         search_terms_str = ", ".join(search_terms) if len(search_terms) > 1 else search_terms[0]
-        return json.dumps({
+        return {
             "error": f"Failed to fetch products for '{search_terms_str}'",
             "details": error_detail,
             "auth_configured": bool(FUSION_AUTH_READ),
             "user_id_configured": bool(FUSION_USER_ID)
-        })
+        }
     
     # Combine all items and remove duplicates (by ItemId + OrganizationId combination)
     all_items = []
@@ -365,11 +364,11 @@ async def find_matching_listings(product_query_terms, limit: int = 10) -> str:
     
     if not data:
         search_terms_str = ", ".join(search_terms) if len(search_terms) > 1 else search_terms[0]
-        return json.dumps({
+        return {
             "error": f"No results found for query: {search_terms_str}",
             "total_queries": len(query_tasks),
             "successful_queries": len([r for r in results if r and not r.get("error")])
-        })
+        }
     
     
     items = data.get("items", [])
@@ -401,9 +400,9 @@ async def find_matching_listings(product_query_terms, limit: int = 10) -> str:
             results.append(group_data)
     
     if not results:
-        return json.dumps({"error": "No products found with valid inventory organizations for procurement.", "products": []})
+        return {"error": "No products found with valid inventory organizations for procurement.", "products": []}
     
-    return json.dumps({"products": results}, indent=2)
+    return {"products": results}
 
 async def retrieve_supplier_detail(supplier_id: str, bu_id: str = None) -> str:
     """Retrieve detailed information for a specific supplier including addresses, contacts, and sites.
@@ -902,17 +901,17 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
     """
     
     if not oracledb:
-        return json.dumps({
+        return {
             "error": "Database module not available",
             "message": "oracledb module is not installed. Please install it with: pip install oracledb"
-        })
+        }
     
     connection = get_db_connection()
     if not connection:
-        return json.dumps({
+        return {
             "error": "Database connection failed",
             "message": "Could not connect to Oracle database. Check wallet configuration and credentials."
-        })
+        }
     
     cursor = None
     try:
@@ -945,13 +944,13 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
         rows = cursor.fetchall()
         
         if not rows:
-            return json.dumps({
+            return {
                 "supplier_id": supplier_id,
                 "message": "No ratings found for this supplier",
                 "total_reviews": 0,
                 "average_rating": None,
                 "reviews": []
-            })
+            }
         
         # Process results
         reviews = []
@@ -989,14 +988,14 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
             "reviews": reviews[:10]  # Return top 10 most recent reviews
         }
         
-        return json.dumps(result, indent=2)
+        return result
         
     except Exception as e:
-        return json.dumps({
+        return {
             "error": "Database query failed",
             "message": str(e),
             "supplier_id": supplier_id
-        })
+        }
     finally:
         if cursor:
             cursor.close()
