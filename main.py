@@ -26,19 +26,19 @@ class ListingsRequest(BaseModel):
     limit: int = 10
 
 class SupplierDetailRequest(BaseModel):
-    supplier_id: str
-    bu_id: Union[str, None] = None
+    supplier_id: str = Field(alias="supplierId")
+    bu_id: Union[str, None] = Field(default=None, alias="buId")
 
 class PurchaseRequisitionRequest(BaseModel):
-    listing_id: str
+    listing_id: str = Field(alias="listingId")
     quantity: int
-    procurement_bu_id: str
-    destination_org_id: str
-    deliver_to_location_id: str
-    requested_delivery_date: Union[str, None] = None
+    procurement_bu_id: str = Field(alias="procurementBuId")
+    destination_org_id: str = Field(alias="destinationOrgId")
+    deliver_to_location_id: str = Field(alias="deliverToLocationId")
+    requested_delivery_date: Union[str, None] = Field(default=None, alias="requestedDeliveryDate")
 
 class SupplierRatingsRequest(BaseModel):
-    supplier_id: str
+    supplier_id: str = Field(alias="supplierId")
 
 @app.get("/")
 async def root():
