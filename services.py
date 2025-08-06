@@ -906,25 +906,41 @@ def get_db_connection():
     if not oracledb:
         return None
     
-    # Setup wallet files from environment variables if they don't exist
-    if not WALLET_DIR.exists() or not (WALLET_DIR / "cwallet.sso").exists():
-        if not setup_wallet_from_env():
-            print("Warning: Could not setup wallet files from environment")
-            return None
-    
     try:
+        # Try direct connection string first (no wallet needed)
+        connection_string = "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.eu-frankfurt-1.oraclecloud.com))(connect_data=(service_name=gaed7f4ac794a14_t2v6c9rz6jx7a2zq_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))"
+        
         connection = oracledb.connect(
             user=DB_USER,
             password=DB_PASSWORD,
-            dsn=DB_DSN,
-            config_dir=str(WALLET_DIR),
-            wallet_location=str(WALLET_DIR),
-            wallet_password=DB_WALLET_PASSWORD
+            dsn=connection_string
         )
+        print("Connected to Oracle DB using direct connection string")
         return connection
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
+    except Exception as e1:
+        print(f"Direct connection failed: {e1}")
+        
+        # Fallback to wallet-based connection
+        try:
+            # Setup wallet files from environment variables if they don't exist
+            if not WALLET_DIR.exists() or not (WALLET_DIR / "cwallet.sso").exists():
+                if not setup_wallet_from_env():
+                    print("Warning: Could not setup wallet files from environment")
+                    return None
+            
+            connection = oracledb.connect(
+                user=DB_USER,
+                password=DB_PASSWORD,
+                dsn=DB_DSN,
+                config_dir=str(WALLET_DIR),
+                wallet_location=str(WALLET_DIR),
+                wallet_password=DB_WALLET_PASSWORD
+            )
+            print("Connected to Oracle DB using wallet")
+            return connection
+        except Exception as e2:
+            print(f"Wallet connection also failed: {e2}")
+            return None
 
 async def retrieve_supplier_ratings(supplier_id: str) -> str:
     """Retrieve supplier ratings and feedback from the database.
