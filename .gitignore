@@ -42,10 +42,10 @@ venv.bak/
 Thumbs.db
 
 # Oracle Wallet - contains sensitive connection files
-wallet/
-*.sso
-*.p12
-*.ora
+# wallet/
+# *.sso
+# *.p12
+# *.ora
 *_b64.txt
 
 # Claude Code
