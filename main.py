@@ -80,16 +80,16 @@ async def submit_purchase_requisition_endpoint(request: PurchaseRequisitionReque
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# @app.post("/retrieve_supplier_ratings")
-# async def retrieve_supplier_ratings_endpoint(request: SupplierRatingsRequest):
-#     """Get supplier performance ratings and feedback scores from Oracle database. Returns average rating, total reviews, and individual feedback entries. Use this to evaluate supplier quality before making procurement decisions."""
-#     try:
-#         result = await retrieve_supplier_ratings(
-#             supplier_id=request.supplier_id
-#         )
-#         return {"data": result}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+@app.post("/retrieve_supplier_ratings")
+async def retrieve_supplier_ratings_endpoint(request: SupplierRatingsRequest):
+    """Get supplier performance ratings and feedback scores from Oracle database. Returns average rating, total reviews, and individual feedback entries. Use this to evaluate supplier quality before making procurement decisions."""
+    try:
+        result = await retrieve_supplier_ratings(
+            supplier_id=request.supplier_id
+        )
+        return {"data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
