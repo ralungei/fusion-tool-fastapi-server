@@ -1,13 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Union, List
 from services import find_matching_listings, retrieve_supplier_detail, submit_purchase_requisition, retrieve_supplier_ratings
+import json
 
 app = FastAPI(
     title="Fusion Procurement Tools",
     description="Oracle Fusion Cloud ERP procurement tools API",
     version="1.0.0"
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    if request.method == "POST":
+        body = await request.body()
+        print(f"📥 Raw request body: {body.decode()}")
+    response = await call_next(request)
+    return response
 
 class ListingsRequest(BaseModel):
     product_query_terms: Union[str, List[str]] = Field(
@@ -43,13 +52,16 @@ async def health_check():
 @app.post("/find_matching_listings")
 async def find_matching_listings_endpoint(request: ListingsRequest):
     """Search for products in Oracle Fusion catalog. Returns items with suppliers, pricing, inventory locations, and procurement details. Use this to find products for purchase requisitions or procurement analysis."""
+    print(f"🔍 Received request: product_query_terms={request.product_query_terms}, limit={request.limit}")
     try:
         result = await find_matching_listings(
             product_query_terms=request.product_query_terms,
             limit=request.limit
         )
+        print(f"✅ Success, returning result")
         return {"data": result}
     except Exception as e:
+        print(f"❌ Error in find_matching_listings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/retrieve_supplier_detail")
