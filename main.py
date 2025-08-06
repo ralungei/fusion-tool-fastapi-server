@@ -20,6 +20,7 @@ async def log_requests(request: Request, call_next):
 
 class ListingsRequest(BaseModel):
     product_query_terms: Union[str, List[str]] = Field(
+        alias="productQueryTerms",
         description="Search terms - provide multiple variations for comprehensive results. For 'brake pads' use: ['brake', 'brake-pads', 'brake pads', 'brake pad'] to cover singular/plural and hyphenated forms"
     )
     limit: int = 10
