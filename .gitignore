@@ -46,6 +46,7 @@ wallet/
 *.sso
 *.p12
 *.ora
+*_b64.txt
 
 # Claude Code
 .claude
