@@ -314,6 +314,22 @@ async def find_matching_listings(product_query_terms, limit: int = 10) -> str:
     # Execute all queries in parallel
     results = await asyncio.gather(*query_tasks)
     
+    # Check for errors in results and collect error details
+    errors = []
+    for idx, data in enumerate(results):
+        if data and "error" in data:
+            errors.append(f"Query {idx}: {data.get('error')}")
+    
+    if errors:
+        error_detail = "; ".join(errors)
+        search_terms_str = ", ".join(search_terms) if len(search_terms) > 1 else search_terms[0]
+        return json.dumps({
+            "error": f"Failed to fetch products for '{search_terms_str}'",
+            "details": error_detail,
+            "auth_configured": bool(FUSION_AUTH_READ),
+            "user_id_configured": bool(FUSION_USER_ID)
+        })
+    
     # Combine all items and remove duplicates (by ItemId + OrganizationId combination)
     all_items = []
     seen_combinations = set()
@@ -334,7 +350,11 @@ async def find_matching_listings(product_query_terms, limit: int = 10) -> str:
     
     if not data:
         search_terms_str = ", ".join(search_terms) if len(search_terms) > 1 else search_terms[0]
-        return f"Unable to fetch product listings for query: {search_terms_str}"
+        return json.dumps({
+            "error": f"No results found for query: {search_terms_str}",
+            "total_queries": len(query_tasks),
+            "successful_queries": len([r for r in results if r and not r.get("error")])
+        })
     
     
     items = data.get("items", [])
