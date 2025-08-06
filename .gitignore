@@ -46,3 +46,6 @@ wallet/
 *.sso
 *.p12
 *.ora
+
+# Claude Code
+.claude

@@ -863,7 +863,7 @@ def format_requisition_response(header: dict, line: dict = None) -> str:
     
     return "\n".join(formatted_lines)
 
-async def get_db_connection():
+def get_db_connection():
     """Get a connection to the Oracle database.
     
     Returns:
@@ -877,7 +877,7 @@ async def get_db_connection():
         return None
     
     try:
-        connection = await oracledb.connect_async(
+        connection = oracledb.connect(
             user=DB_USER,
             password=DB_PASSWORD,
             dsn=DB_DSN,
@@ -906,36 +906,42 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
             "message": "oracledb module is not installed. Please install it with: pip install oracledb"
         })
     
-    connection = await get_db_connection()
+    connection = get_db_connection()
     if not connection:
         return json.dumps({
             "error": "Database connection failed",
             "message": "Could not connect to Oracle database. Check wallet configuration and credentials."
         })
     
+    cursor = None
     try:
-        cursor = await connection.cursor()
+        cursor = connection.cursor()
+        
+        # First, let's discover the table structure
+        cursor.execute("SELECT * FROM SUPPLIERFEEDBACK WHERE ROWNUM = 1")
+        columns = [col[0] for col in cursor.description]
         
         # Query to get supplier feedback and ratings
-        query = """
-            SELECT 
-                SUPPLIER_ID,
-                RATING,
-                FEEDBACK_TEXT,
-                REVIEW_DATE,
-                REVIEWER_NAME,
-                ORDER_ID,
-                CATEGORY
-            FROM SUPPLIERFEEDBACK
-            WHERE SUPPLIER_ID = :supplier_id
-            ORDER BY REVIEW_DATE DESC
-        """
-        
-        await cursor.execute(query, supplier_id=supplier_id)
+        if supplier_id == "ALL":
+            # Special case to see all data for testing
+            query = f"""
+                SELECT {', '.join(columns)}
+                FROM SUPPLIERFEEDBACK
+                ORDER BY ROWNUM
+            """
+            cursor.execute(query)
+        else:
+            query = f"""
+                SELECT {', '.join(columns)}
+                FROM SUPPLIERFEEDBACK
+                WHERE SUPPLIER_PARTY_ID = :supplier_id
+                ORDER BY ROWNUM
+            """
+            cursor.execute(query, supplier_id=supplier_id)
         
         # Fetch all results
         columns = [col[0] for col in cursor.description]
-        rows = await cursor.fetchall()
+        rows = cursor.fetchall()
         
         if not rows:
             return json.dumps({
@@ -952,16 +958,24 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
         
         for row in rows:
             review = dict(zip(columns, row))
-            reviews.append({
-                "rating": review.get("RATING"),
-                "feedback": review.get("FEEDBACK_TEXT"),
-                "date": str(review.get("REVIEW_DATE")) if review.get("REVIEW_DATE") else None,
-                "reviewer": review.get("REVIEWER_NAME"),
-                "order_id": review.get("ORDER_ID"),
-                "category": review.get("CATEGORY")
-            })
-            if review.get("RATING"):
-                total_rating += review.get("RATING")
+            # Create a flexible review object with all available columns
+            review_data = {}
+            for col in columns:
+                value = review.get(col)
+                if value is not None:
+                    review_data[col.lower()] = str(value) if not isinstance(value, (int, float)) else value
+            
+            reviews.append(review_data)
+            
+            # Try to find rating column (could be FEEDBACK_SCORE, RATING, SCORE, etc.)
+            rating = None
+            for col in ["FEEDBACK_SCORE", "RATING", "SCORE", "STARS", "VALUE"]:
+                if col in review and review[col] is not None:
+                    rating = review[col]
+                    break
+            
+            if rating:
+                total_rating += rating
         
         # Calculate average rating
         average_rating = total_rating / len(rows) if rows else None
@@ -970,6 +984,7 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
             "supplier_id": supplier_id,
             "total_reviews": len(rows),
             "average_rating": round(average_rating, 2) if average_rating else None,
+            "table_columns": columns,  # Show what columns are available
             "reviews": reviews[:10]  # Return top 10 most recent reviews
         }
         
@@ -982,5 +997,6 @@ async def retrieve_supplier_ratings(supplier_id: str) -> str:
             "supplier_id": supplier_id
         })
     finally:
-        await cursor.close()
-        await connection.close()
+        if cursor:
+            cursor.close()
+        connection.close()

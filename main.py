@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Union, List
 from services import find_matching_listings, retrieve_supplier_detail, submit_purchase_requisition, retrieve_supplier_ratings
 
@@ -10,7 +10,9 @@ app = FastAPI(
 )
 
 class ListingsRequest(BaseModel):
-    product_query_terms: Union[str, List[str]]
+    product_query_terms: Union[str, List[str]] = Field(
+        description="Search terms - provide multiple variations for comprehensive results. For 'brake pads' use: ['brake', 'brake-pads', 'brake pads', 'brake pad'] to cover singular/plural and hyphenated forms"
+    )
     limit: int = 10
 
 class SupplierDetailRequest(BaseModel):
@@ -40,7 +42,7 @@ async def health_check():
 
 @app.post("/find_matching_listings")
 async def find_matching_listings_endpoint(request: ListingsRequest):
-    """Find matching product listings in Oracle Fusion based on search terms"""
+    """Search for products in Oracle Fusion catalog. Returns items with suppliers, pricing, inventory locations, and procurement details. Use this to find products for purchase requisitions or procurement analysis."""
     try:
         result = await find_matching_listings(
             product_query_terms=request.product_query_terms,
@@ -52,7 +54,7 @@ async def find_matching_listings_endpoint(request: ListingsRequest):
 
 @app.post("/retrieve_supplier_detail")
 async def retrieve_supplier_detail_endpoint(request: SupplierDetailRequest):
-    """Retrieve detailed information for a specific supplier"""
+    """Get comprehensive supplier information including addresses, contacts, sites, and business unit relationships. Use this to understand supplier capabilities and delivery locations for procurement decisions."""
     try:
         result = await retrieve_supplier_detail(
             supplier_id=request.supplier_id,
@@ -64,7 +66,7 @@ async def retrieve_supplier_detail_endpoint(request: SupplierDetailRequest):
 
 @app.post("/submit_purchase_requisition")
 async def submit_purchase_requisition_endpoint(request: PurchaseRequisitionRequest):
-    """Submit a purchase requisition for a specific item"""
+    """Create a purchase requisition in Oracle Fusion for procurement approval workflow. Requires item ID, quantity, business unit, delivery location, and delivery date. Always confirm details with user before submitting."""
     try:
         result = await submit_purchase_requisition(
             listing_id=request.listing_id,
@@ -80,7 +82,7 @@ async def submit_purchase_requisition_endpoint(request: PurchaseRequisitionReque
 
 @app.post("/retrieve_supplier_ratings")
 async def retrieve_supplier_ratings_endpoint(request: SupplierRatingsRequest):
-    """Retrieve supplier ratings and feedback from Oracle database"""
+    """Get supplier performance ratings and feedback scores from Oracle database. Returns average rating, total reviews, and individual feedback entries. Use this to evaluate supplier quality before making procurement decisions."""
     try:
         result = await retrieve_supplier_ratings(
             supplier_id=request.supplier_id
