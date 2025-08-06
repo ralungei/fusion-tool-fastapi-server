@@ -12,7 +12,6 @@ except ImportError:
 
 try:
     import oracledb
-    import base64
 except ImportError:
     oracledb = None
 
@@ -29,11 +28,7 @@ DB_DSN = os.getenv("DB_DSN", "t2v6c9rz6jx7a2zq_high")
 DB_WALLET_PASSWORD = os.getenv("DB_WALLET_PASSWORD", "admin123")
 WALLET_DIR = Path("wallet")
 
-# Wallet files from environment variables (base64 encoded)
-CWALLET_SSO_B64 = os.getenv("CWALLET_SSO_B64")
-EWALLET_P12_B64 = os.getenv("EWALLET_P12_B64") 
-SQLNET_ORA_B64 = os.getenv("SQLNET_ORA_B64")
-TNSNAMES_ORA_B64 = os.getenv("TNSNAMES_ORA_B64")
+# Wallet files are now directly in the repo
 
 required_vars = {
     "FUSION_AUTH_READ": FUSION_AUTH_READ,
@@ -870,32 +865,7 @@ def format_requisition_response(header: dict, line: dict = None) -> str:
     
     return "\n".join(formatted_lines)
 
-def setup_wallet_from_env():
-    """Create wallet files from base64 environment variables."""
-    wallet_files = {
-        "cwallet.sso": CWALLET_SSO_B64,
-        "ewallet.p12": EWALLET_P12_B64,
-        "sqlnet.ora": SQLNET_ORA_B64,
-        "tnsnames.ora": TNSNAMES_ORA_B64
-    }
-    
-    # Create wallet directory if it doesn't exist
-    WALLET_DIR.mkdir(exist_ok=True)
-    
-    for filename, b64_content in wallet_files.items():
-        if b64_content:
-            try:
-                # Decode base64 and write file
-                file_content = base64.b64decode(b64_content)
-                file_path = WALLET_DIR / filename
-                with open(file_path, 'wb') as f:
-                    f.write(file_content)
-                print(f"Created wallet file: {filename}")
-            except Exception as e:
-                print(f"Error creating wallet file {filename}: {e}")
-                return False
-    
-    return True
+# Removed setup_wallet_from_env - wallet files are directly in repo now
 
 def get_db_connection():
     """Get a connection to the Oracle database.
@@ -907,12 +877,6 @@ def get_db_connection():
         return None
     
     try:
-        # Setup wallet files from environment variables if they don't exist
-        if not WALLET_DIR.exists() or not (WALLET_DIR / "cwallet.sso").exists():
-            if not setup_wallet_from_env():
-                print("Warning: Could not setup wallet files from environment")
-                return None
-        
         connection = oracledb.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -921,7 +885,7 @@ def get_db_connection():
             wallet_location=str(WALLET_DIR),
             wallet_password=DB_WALLET_PASSWORD
         )
-        print("Connected to Oracle DB using wallet")
+        print("Connected to Oracle DB using wallet files from repo")
         return connection
     except Exception as e:
         print(f"Wallet connection failed: {e}")
